@@ -80,7 +80,7 @@ public class AssetExportSession {
     private let pauseDispatchGroup = DispatchGroup()
     private var cancelled: Bool = false
     
-    public init(asset: AVAsset, outputURL: URL, configuration: Configuration) throws {
+    public init(asset: AVAsset, outputURL: URL, configuration: Configuration) async throws {
         self.asset = asset.copy() as! AVAsset
         self.configuration = configuration
         self.outputURL = outputURL
@@ -97,7 +97,13 @@ public class AssetExportSession {
             self.duration = self.asset.duration
         }
         
-        let videoTracks = self.asset.tracks(withMediaType: .video)
+        var videoTracks: [AVAssetTrack] = []
+        if #available(iOS 15.0, *) {
+          videoTracks = try await self.asset.loadTracks(withMediaType: .video)
+            .filterAsync { try await $0.load(.isEnabled) }
+        } else {
+          videoTracks = self.asset.tracks(withMediaType: .video)
+        }
         if (videoTracks.count > 0) {
             let videoOutput: AVAssetReaderOutput
             let inputTransform: CGAffineTransform?
@@ -151,7 +157,13 @@ public class AssetExportSession {
             self.videoInput = nil
         }
         
-        let audioTracks = self.asset.tracks(withMediaType: .audio)
+        var audioTracks: [AVAssetTrack] = []
+        if #available(iOS 15, *) {
+          audioTracks = try await self.asset.loadTracks(withMediaType: .audio)
+            .filterAsync { try await $0.load(.isEnabled) }
+        } else {
+          audioTracks = self.asset.tracks(withMediaType: .audio)
+        }
         if audioTracks.count > 0 {
             let audioOutput = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: nil)
             audioOutput.alwaysCopiesSampleData = false
